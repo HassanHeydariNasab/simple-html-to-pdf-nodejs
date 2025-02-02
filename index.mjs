@@ -7,6 +7,8 @@ import "jspdf-autotable";
 /** @import {CellDef, RowInput} from 'jspdf-autotable' */
 import { JSDOM } from "jsdom";
 
+import { GAP, NODE_TYPE, tagNameToFontSize } from "./constants.mjs";
+
 const globalFontRegular = readFileSync(
   join("static/fonts/GoNotoKurrent-Regular.ttf"),
   {
@@ -34,30 +36,14 @@ export function generatePdf(html) {
   pdf.save("./output/a4.pdf");
 }
 
-const tagNameToFontSize = {
-  H1: 20,
-  H2: 18,
-  H3: 16,
-  H4: 14,
-  H5: 12,
-  H6: 10,
-  P: 10,
-};
-
-const GAP = 20;
-
 /**
  * @param {DOMWindow} win
- * @param {Element} element
- * @param {string} content
- * @param {number} order
+ * @param {Node[]} nodes
  * @returns {CellDef}
  */
-const constructCell = ({ win, element, content, order }) => {
+const constructCell = ({ win, nodes }) => {
   /** @type {CSSStyleDeclaration} */
   const style = win.getComputedStyle(element);
-
-  console.log(element.tagName, { style });
 
   /**
    * @type {CellDef['styles']}
@@ -73,18 +59,13 @@ const constructCell = ({ win, element, content, order }) => {
 
   for (const key in cellPadding) {
     if (cellPadding[key] !== 0 && !cellPadding[key]) {
-      if (["H1", "H2", "H3", "H4", "H5", "H6"].includes(element.tagName)) {
-        cellPadding[key] = key === "top" || key === "bottom" ? 10 : 5;
-        cellStyles.fontSize = tagNameToFontSize[element.tagName] ?? 10;
-        cellStyles.fontStyle = "";
-        //cellStyles.fontStyle = style.fontWeight === "bold" ? "bold" : "normal";
-      } else {
-        cellPadding[key] = 5;
-      }
+      cellPadding[key] = key === "top" || key === "bottom" ? 10 : 5;
     }
   }
-
   cellStyles.cellPadding = cellPadding;
+
+  cellStyles.fontSize = tagNameToFontSize[element.tagName] ?? 10;
+  cellStyles.fontStyle = style.fontWeight || "normal";
 
   switch (element.tagName) {
     case "P": {
@@ -138,10 +119,13 @@ export const insertHtmlToPdf = ({
   /** @type Node */
   let node = doc.body;
 
-  let inlineContent = "";
-  // Mark nodes as met while going back to the root
+  /** @type Node[] */
+  let inlineNodes = [];
+
   while (true) {
-    // parent node
+    console.log(node.nodeName);
+
+    // root node
     if (node.hasChildNodes()) {
       node = node.firstChild;
       continue;
@@ -154,38 +138,38 @@ export const insertHtmlToPdf = ({
     /** @type {CSSStyleDeclaration} */
     let computedStyle = {};
 
-    if (node.nodeType === 1) {
+    if (node.nodeType === NODE_TYPE.ELEMENT_NODE) {
       computedStyle = win.getComputedStyle(node);
       display = computedStyle.display || "inline";
     }
 
     if (
-      (node.nodeType === 1 && display.startsWith("inline")) ||
-      node.nodeType === 3
+      (node.nodeType === NODE_TYPE.ELEMENT_NODE &&
+        display.startsWith("inline")) ||
+      node.nodeType === NODE_TYPE.TEXT_NODE
     ) {
       // inline
-      inlineContent += node.textContent.trim().length
-        ? node.textContent.trim() + " "
-        : "";
-      if (!node.nextSibling && inlineContent) {
+      inlineNodes.push(node);
+
+      if (!node.nextSibling && inlineNodes.length) {
         tableBody.push([
           constructCell({
-            content: inlineContent,
-            element: node.nodeType === 3 ? node.parentElement : node,
-            computedStyle,
+            nodes: inlineNodes,
             win,
-            order: 0,
           }),
         ]);
 
-        inlineContent = "";
+        inlineNodes = "";
       }
-    } else {
+    } else if (
+      node.nodeType === NODE_TYPE.ELEMENT_NODE &&
+      !display.startsWith("inline")
+    ) {
       // block
-      if (inlineContent) {
+      if (inlineNodes) {
         // flush inline content
-        tableBody.push([{ content: inlineContent.trim() }]);
-        inlineContent = "";
+        tableBody.push([{ content: inlineNodes.trim() }]);
+        inlineNodes = "";
       }
       // block content
       tableBody.push([
@@ -197,6 +181,8 @@ export const insertHtmlToPdf = ({
           order: 0,
         }),
       ]);
+    } else {
+      throw new Error("Unknown node type");
     }
 
     if (node.nextSibling) {
@@ -239,11 +225,12 @@ export const insertHtmlToPdf = ({
 
 generatePdf(
   /* HTML */ `<html>
+    <head></head>
     <body>
       <h1>Heading1</h1>
       <p>This is a sample paragraph.</p>
       <h2 style="color: red">Heading2</h2>
-      <p>This is another sample paragraph with <b>bold</b> word.</p>
+      <p>This is another <b>sample</b> paragraph with <b>bold</b> word.</p>
     </body>
   </html>`,
 );
