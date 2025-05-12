@@ -6,13 +6,13 @@ export const NODE_TYPE = {
 };
 
 export const tagNameToFontSize = {
-  H1: 20,
-  H2: 18,
-  H3: 16,
-  H4: 14,
-  H5: 12,
+  H1: 32,
+  H2: 24,
+  H3: 18,
+  H4: 16,
+  H5: 13,
   H6: 10,
-  P: 10,
+  P: 16,
 };
 
 export const GAP = 20;

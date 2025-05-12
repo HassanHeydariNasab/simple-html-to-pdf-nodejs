@@ -1,19 +1,50 @@
-// Limitations
-// - No support for border spacing
-// - No support for transparency
-import { parseSpacing, MarginPadding } from './common'
-import { Styles } from './config'
+/** @import {DOMWindow} from 'jsdom' */
+/** @import {Styles} from 'jspdf' */
+
+import { parseSpacing } from './common'
+
+
+
+/**
+ * @param {string} style
+ * @returns {Partial<CSSStyleDeclaration>}
+ */
+export function parseStyleAttribute(style) {
+    return style.split(";").reduce((result, item) => {
+        if (!item) {
+            return result
+        }
+        /** @type {[string, string]} */
+        const pair = item.split(":")
+        if (pair.length === 2 && pair[0] && pair[1]) {
+            result[pair[0].strip()] = pair[1].strip()
+            }
+        return result
+    }, {})
+}
+
+/**
+ * @param {string[]} supportedFonts
+ * @param {Element} element
+ * @param {number} scaleFactor
+ * @param {CSSStyleDeclaration} style
+ * @param {DOMWindow} window
+ * @returns {Partial<Styles>}
+ */
 
 export function parseCss(
-  supportedFonts: string[],
-  element: Element,
-  scaleFactor: number,
-  style: CSSStyleDeclaration,
-  window: Window,
-): Partial<Styles> {
-  const result: Partial<Styles> = {}
+  supportedFonts,
+  element,
+  scaleFactor,
+  window,
+) {
+
+  /** @type Partial<Styles> */
+  const result = {}
 
   const pxScaleFactor = 96 / 72
+
+  const style = window.getComputedStyle(element)
 
   const backgroundColor = parseColor(element, (elem) => {
     return window.getComputedStyle(elem)['backgroundColor']
